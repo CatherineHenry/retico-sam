@@ -19,11 +19,11 @@ import retico_core
 import sys
 
 prefix = '../../'
-sys.path.append(prefix+'retico-vision')
+sys.path.append(prefix+'retico_vision')
 
 from retico_vision.vision import ImageIU, DetectedObjectsIU
 
-class SAM(retico_core.AbstractModule):
+class SAMModule(retico_core.AbstractModule):
     @staticmethod
     def name():
         return "SAM Object Detection Module"
@@ -41,9 +41,9 @@ class SAM(retico_core.AbstractModule):
         return DetectedObjectsIU
     
     MODEL_OPTIONS = {
-        "vit_h": "../checkpoint/sam_vit_h_4b8939.pth",
-        "vit_l": "../checkpoint/sam_vit_l_0b3195.pth",
-        "vit_b": "../checkpoint/sam_vit_b_01ec64.pth",
+        "vit_h": "..\checkpoint\sam_vit_h_4b8939.pth",
+        "vit_l": "..\checkpoint\sam_vit_l_0b3195.pth",
+        "vit_b": "..\checkpoint\sam_vit_b_01ec64.pth",
     }
 
     #if decided that using alytics like YOLO did is better, use this
@@ -72,7 +72,7 @@ class SAM(retico_core.AbstractModule):
 
         #device = "cuda"
 
-        self.model = sam_model_registry[model_type](self.MODEL_OPTIONS.get(model_type))
+        self.model = sam_model_registry[model_type](checkpoint=self.MODEL_OPTIONS.get(model_type))
         #self.model.to(device)
         self.queue = deque(maxlen=1)
 
