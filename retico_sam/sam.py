@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import threading 
 import time 
+import os
 from segment_anything import SamPredictor, sam_model_registry, SamAutomaticMaskGenerator
 #could same path as retico_yolo and use ultralytics 
 #from ultralytics import SAM
@@ -20,6 +21,15 @@ import sys
 
 prefix = '../../'
 sys.path.append(prefix+'retico_vision')
+
+# print(sys.path)
+
+# for dir in sys.path: 
+#     print(dir)
+#     print([f for f in os.listdir(dir) if os.path.isfile(f)])
+#     print()
+# print("listing complete")
+
 
 from retico_vision.vision import ImageIU, DetectedObjectsIU
 
@@ -53,7 +63,7 @@ class SAMModule(retico_core.AbstractModule):
     # }
 
 
-    def __init__(self, model_type=None, **kwargs):
+    def __init__(self, model=None, path_to_chkpnt=None, **kwargs):
         """
         Initialize the SAM Object Detection Module
         Args:
@@ -62,17 +72,18 @@ class SAMModule(retico_core.AbstractModule):
         """
         super().__init__(**kwargs)
 
-        if model_type not in self.MODEL_OPTIONS.keys():
+        if model not in self.MODEL_OPTIONS.keys():
             print("Unknown model option. Defaulting to VIT-H SAM model.")
             #print("Unknown model option. Defaulting to b (SAM base).")
             print("Other options include 'vit_l' and 'vit_b'.")
             #print("Other options include 'l'.")
             #print("See https://docs.ultralytics.com/models/sam/#key-features-of-the-segment-anything-model-sam for mroe info.")
-            model_type = "vit_h"
+            model = "vit_h"
 
         #device = "cuda"
-
-        self.model = sam_model_registry[model_type](checkpoint=self.MODEL_OPTIONS.get(model_type))
+        sam_checkpoint = self.MODEL_OPTIONS.get(model)
+        
+        self.model = sam_model_registry[model](checkpoint=path_to_chkpnt)
         #self.model.to(device)
         self.queue = deque(maxlen=1)
 
@@ -110,9 +121,18 @@ class SAMModule(retico_core.AbstractModule):
 
             valid_boxes = []
             for mask in masks_generated:
-                valid_boxes.append(masks_generated[mask]['bbox'].cpu().numpy()) #mask bounding box in XYWH format 
+                valid_boxes.append(masks_generated[mask]['bbox']) #mask bounding box in XYWH format 
 
             print(valid_boxes)
+
+            #what if i passed along the image with only the mask showing and the rest all white? 
+            # image = cv2.imread('images/dogs.jpg')
+            # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+            # mask = masks[2]['segmentation']
+            # image[mask==False] = [255,255,255]
+            # plt.imshow(image)
+            # plt.axis('off')
 
             if len(valid_boxes) == 0: continue
 
