@@ -11,10 +11,8 @@ import cv2
 import numpy as np
 import threading 
 import time 
-import os
-from segment_anything import SamPredictor, sam_model_registry, SamAutomaticMaskGenerator
-#could same path as retico_yolo and use ultralytics 
-#from ultralytics import SAM
+import torch
+from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 
 import retico_core
 import sys
@@ -22,13 +20,6 @@ import sys
 prefix = '../../'
 sys.path.append(prefix+'retico_vision')
 
-# print(sys.path)
-
-# for dir in sys.path: 
-#     print(dir)
-#     print([f for f in os.listdir(dir) if os.path.isfile(f)])
-#     print()
-# print("listing complete")
 
 
 from retico_vision.vision import ImageIU, DetectedObjectsIU
@@ -51,19 +42,12 @@ class SAMModule(retico_core.AbstractModule):
         return DetectedObjectsIU
     
     MODEL_OPTIONS = {
-        "vit_h": "..\checkpoint\sam_vit_h_4b8939.pth",
-        "vit_l": "..\checkpoint\sam_vit_l_0b3195.pth",
-        "vit_b": "..\checkpoint\sam_vit_b_01ec64.pth",
+        "h": "vit_h",
+        "l": "vit_l",
+        "b": "vit_b",
     }
 
-    #if decided that using alytics like YOLO did is better, use this
-    # MODEL_OPTIONS = {
-    #     "b": "sam_b.pt",
-    #     "l": "sam_l.pt",
-    # }
-
-
-    def __init__(self, model=None, path_to_chkpnt=None, **kwargs):
+    def __init__(self, model=None, path_to_chkpnt=None, use_bbox=False, use_seg=False, **kwargs):
         """
         Initialize the SAM Object Detection Module
         Args:
@@ -72,21 +56,31 @@ class SAMModule(retico_core.AbstractModule):
         """
         super().__init__(**kwargs)
 
-        if model not in self.MODEL_OPTIONS.keys():
-            print("Unknown model option. Defaulting to VIT-H SAM model.")
-            #print("Unknown model option. Defaulting to b (SAM base).")
-            print("Other options include 'vit_l' and 'vit_b'.")
-            #print("Other options include 'l'.")
-            #print("See https://docs.ultralytics.com/models/sam/#key-features-of-the-segment-anything-model-sam for mroe info.")
+        if model and model.lower() in self.MODEL_OPTIONS:
+            model = self.MODEL_OPTIONS[model.lower()]
+            print(f"Using {model}. Make sure you have the corresponding checkpoint being passed in.")
+        else: 
+            print("Unknown model option. Defaulting to h (VIT-H) SAM model.")
+            print("Other options include 'l' for vit_l and 'b' for vit_b.")
             model = "vit_h"
 
-        #device = "cuda"
-        sam_checkpoint = self.MODEL_OPTIONS.get(model)
-        
-        self.model = sam_model_registry[model](checkpoint=path_to_chkpnt)
-        #self.model.to(device)
-        self.queue = deque(maxlen=1)
+        if (use_bbox==False and use_seg==False):
+            print("You may choose to use only bounding box or segmentation, please set ONLY one to true.")
+            exit()
 
+        if (path_to_chkpnt==None):
+            print("Path to checkpoint matching model type must be passed in.")
+            exit()
+
+        cuda_available = torch.cuda.is_available()
+      
+        self.model = sam_model_registry[model](checkpoint=path_to_chkpnt) #Only worked if passed in otherwise struggled to find path
+        if (cuda_available):
+            device = "cuda"
+            self.model.to(device=device)
+        self.queue = deque(maxlen=1)
+        self.use_bbox = use_bbox
+        self.use_seg = use_seg
 
     def process_update(self, update_message):
         for iu, ut in update_message:
@@ -99,11 +93,14 @@ class SAMModule(retico_core.AbstractModule):
         while self._detector_thread_active:
             time.sleep(2)
             if len(self.queue) == 0:
-                time.sleep(0.5)
+                time.sleep(0.5) # original(0.5) ~ change this for more time between segmentation of each image
                 continue
             
             input_iu = self.queue.popleft()
             image = input_iu.payload 
+
+            sam_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
+            # cv2.imwrite('test_image.png', sam_image)
 
             mask_generator = SamAutomaticMaskGenerator(
                 model= self.model,
@@ -115,33 +112,31 @@ class SAMModule(retico_core.AbstractModule):
                 min_mask_region_area=400
             )
 
-            masks_generated = mask_generator.generate(image)
+            masks_generated = mask_generator.generate(sam_image)
 
-            print(masks_generated[0].keys())
+            # print(masks_generated[0].keys())
 
-            valid_boxes = []
-            for mask in masks_generated:
-                valid_boxes.append(masks_generated[mask]['bbox']) #mask bounding box in XYWH format 
+            if self.use_bbox:
+                valid_boxes = [] 
+                for box_num in range(len(masks_generated)):
+                    valid_boxes.append(masks_generated[box_num]['bbox']) #mask bounding box in XYWH format 
+            if self.use_seg:
+                valid_segs = [] 
+                for seg_num in range(len(masks_generated)):
+                    valid_segs.append(masks_generated[seg_num]['segmentation'])   
 
-            print(valid_boxes)
-
-            #what if i passed along the image with only the mask showing and the rest all white? 
-            # image = cv2.imread('images/dogs.jpg')
-            # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-            # mask = masks[2]['segmentation']
-            # image[mask==False] = [255,255,255]
-            # plt.imshow(image)
-            # plt.axis('off')
-
-            if len(valid_boxes) == 0: continue
+            if self.use_bbox:
+                if len(valid_boxes) == 0: continue
+            elif self.use_seg: 
+                if len(valid_segs) == 0: continue
 
             output_iu = self.create_iu(input_iu)
-            output_iu.set_detected_objects(image, valid_boxes)
+            if self.use_bbox:
+                output_iu.set_detected_objects(image, valid_boxes, "bb")
+            elif self.use_seg:
+                output_iu.set_detected_objects(image, valid_segs, "seg")
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
             self.append(um)
-
-
 
     def prepare_run(self):
         self._detector_thread_active = True
