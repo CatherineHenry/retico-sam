@@ -30,8 +30,8 @@ The Extract Objects module allows the user to determine how many images to plot 
 * num_obj_to_display = number of extracted segmentation objects to display in the plot that will be saved to a folder named 'extracted_objects' NOTE: if the folder doesn't exist it will be created, otherwise it will just store the new image in the folder
 
 ### Example
-import sys, os
-from retico import *
+import sys, os  
+from retico import *  
 
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'  
 os.environ['RETICO'] = 'retico_core'  
