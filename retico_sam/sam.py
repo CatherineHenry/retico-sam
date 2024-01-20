@@ -17,8 +17,8 @@ from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 import retico_core
 import sys
 
-prefix = '../../'
-sys.path.append(prefix+'retico_vision')
+#prefix = '../../'
+#sys.path.append(prefix+'retico_vision')
 
 
 
