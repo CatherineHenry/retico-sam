@@ -100,7 +100,7 @@ class SAMModule(retico_core.AbstractModule):
             image = input_iu.payload 
 
             sam_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
-            # cv2.imwrite('test_image.png', sam_image)
+            cv2.imwrite('./test_sam_image.jpg', sam_image)
 
             mask_generator = SamAutomaticMaskGenerator(
                 model= self.model,
@@ -111,10 +111,11 @@ class SAMModule(retico_core.AbstractModule):
                 crop_n_points_downscale_factor=2,
                 min_mask_region_area=400
             )
-
+            print(f"Generating SAM mask")
+            start = time.time()
             masks_generated = mask_generator.generate(sam_image)
-
-            # print(masks_generated[0].keys())
+            end = time.time()
+            print(f"[time elapsed: {end - start}] {masks_generated[0].keys()}")
 
             if self.use_bbox:
                 valid_boxes = [] 
