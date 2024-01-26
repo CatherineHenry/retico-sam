@@ -81,8 +81,8 @@ class SAMModule(retico_core.AbstractModule):
             print(f"Generating SAM mask")
             start = time.time()
             outputs = self.generator(image, points_per_batch=64)
-            print(f"[time elapsed: {end - start}]")
             end = time.time()
+            print(f"[time elapsed: {end - start}]")
             masks = np.array(outputs["masks"])
             if len(masks) == 0: continue
 
