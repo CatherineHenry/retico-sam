@@ -52,7 +52,7 @@ class SAMModule(retico_core.AbstractModule):
         super().__init__(**kwargs)
 
       
-        self.generator = pipeline("mask-generation", model=model, device=0)
+        self.generator = pipeline("mask-generation", model=model, device="cpu")
         self.queue = deque(maxlen=1)
         self.use_bbox = use_bbox
         self.use_seg = use_seg
@@ -78,8 +78,11 @@ class SAMModule(retico_core.AbstractModule):
 
             # sam_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
             # cv2.imwrite('test_image.png', sam_image)
-
+            print(f"Generating SAM mask")
+            start = time.time()
             outputs = self.generator(image, points_per_batch=64)
+            print(f"[time elapsed: {end - start}]")
+            end = time.time()
             masks = np.array(outputs["masks"])
             if len(masks) == 0: continue
 

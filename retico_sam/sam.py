@@ -12,7 +12,8 @@ import numpy as np
 import threading 
 import time 
 import torch
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+# from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+from mobile_sam import sam_model_registry, SamAutomaticMaskGenerator
 
 import retico_core
 import sys
@@ -41,12 +42,18 @@ class SAMModule(retico_core.AbstractModule):
     def output_iu():
         return DetectedObjectsIU
     
+    # MODEL_OPTIONS = {
+    #     "h": "vit_h",
+    #     "l": "vit_l",
+    #     "b": "vit_b",
+    # }
+
     MODEL_OPTIONS = {
         "h": "vit_h",
         "l": "vit_l",
         "b": "vit_b",
+        "t": "vit_t",
     }
-
     def __init__(self, model=None, path_to_chkpnt=None, use_bbox=False, use_seg=False, **kwargs):
         """
         Initialize the SAM Object Detection Module
