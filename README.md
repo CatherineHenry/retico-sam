@@ -46,12 +46,15 @@ from retico_core.debug import DebugModule
 from retico_vision.vision import WebcamModule  
 from retico_vision.vision import ExtractObjectsModule   
 from retico_sam.sam import SAMModule  
+## OR
+# from retico_sam.hfsam import SAMModule
   
 path_var = *** REPLACE WITH PATH TO YOUR CHECKPOINT ***
 
 
 webcam = WebcamModule()  
 sam = SAMModule(model='h', path_to_chkpnt=path_var, use_bbox=True)  
+# sam = SAMModule(show=False, use_bbox=True)   # if hfsam
 extractor = ExtractObjectsModule(num_obj_to_display=20)  
 debug = DebugModule()  
 
