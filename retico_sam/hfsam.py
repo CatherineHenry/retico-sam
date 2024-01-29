@@ -5,7 +5,7 @@ Segment Anything Module
 This module provides ability to segment anything within an image and 
 detect all different objects within the image. 
 """
-
+import base64
 from collections import deque
 import numpy as np
 import threading 
@@ -89,7 +89,8 @@ class SAMModule(retico_core.AbstractModule):
             output_iu = self.create_iu(input_iu)
             if self.use_bbox:
                 bbox = sv.mask_to_xyxy(masks)
-                output_iu.set_detected_objects(image, bbox, "bb")
+                bytes = image.tobytes()
+                output_iu.set_detected_objects(base64.b64encode(bytes).decode(), bbox.tolist(), "bb")
             elif self.use_seg:
                 output_iu.set_detected_objects(image, masks, "seg")
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
