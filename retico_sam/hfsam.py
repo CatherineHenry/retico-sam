@@ -7,6 +7,8 @@ detect all different objects within the image.
 """
 import base64
 from collections import deque
+from datetime import datetime
+
 import numpy as np
 import threading 
 import time 
@@ -17,6 +19,10 @@ import retico_core
 import gc
 import sys
 # import cv2
+
+import numpy as np
+import matplotlib.pyplot as plt
+import gc
 
 #prefix = '../../'
 #sys.path.append(prefix+'retico_vision')
@@ -52,11 +58,34 @@ class SAMModule(retico_core.AbstractModule):
         super().__init__(**kwargs)
 
       
-        self.generator = pipeline("mask-generation", model=model, device="cpu")
+        self.generator = pipeline("mask-generation", model=model, device="cuda")
         self.queue = deque(maxlen=1)
         self.use_bbox = use_bbox
         self.use_seg = use_seg
         self.show = show
+
+    def show_mask(self, mask, ax, random_color=False):
+        if random_color:
+            color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+        else:
+            color = np.array([30 / 255, 144 / 255, 255 / 255, 0.6])
+        h, w = mask.shape[-2:]
+        mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+        ax.imshow(mask_image)
+        del mask
+        gc.collect()
+
+    def show_masks_on_image(self, raw_image, masks):
+        plt.imshow(np.array(raw_image))
+        ax = plt.gca()
+        ax.set_autoscale_on(False)
+        for mask in masks:
+            self.show_mask(mask, ax=ax, random_color=True)
+        plt.axis("off")
+        plt.show()
+        plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
+        del mask
+        gc.collect()
 
     def process_update(self, update_message):
         for iu, ut in update_message:
@@ -84,6 +113,8 @@ class SAMModule(retico_core.AbstractModule):
             end = time.time()
             print(f"[time elapsed: {end - start}]")
             masks = np.array(outputs["masks"])
+            self.show_masks_on_image(image, masks)
+
             if len(masks) == 0: continue
 
             output_iu = self.create_iu(input_iu)
@@ -92,7 +123,8 @@ class SAMModule(retico_core.AbstractModule):
                 bytes = image.tobytes()
                 output_iu.set_detected_objects(base64.b64encode(bytes).decode(), bbox.tolist(), "bb")
             elif self.use_seg:
-                output_iu.set_detected_objects(image, masks, "seg")
+                bytes = image.tobytes()
+                output_iu.set_detected_objects(base64.b64encode(bytes).decode(), masks.tolist(), "seg")
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
             self.append(um)
 
