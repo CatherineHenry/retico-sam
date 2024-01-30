@@ -5,13 +5,16 @@ Segment Anything Module
 This module provides ability to segment anything within an image and 
 detect all different objects within the image. 
 """
-
+import gc
 from collections import deque
+from datetime import datetime
+
 import cv2
 import numpy as np
 import threading 
 import time 
 import torch
+from matplotlib import pyplot as plt
 # from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 from mobile_sam import sam_model_registry, SamAutomaticMaskGenerator
 
@@ -95,6 +98,72 @@ class SAMModule(retico_core.AbstractModule):
                 continue
             else:
                 self.queue.append(iu)
+    #
+    # def show_mask(self, mask, ax, random_color=False):
+    #     if random_color:
+    #         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+    #     else:
+    #         color = np.array([30 / 255, 144 / 255, 255 / 255, 0.6])
+    #     h, w = mask.shape[-2:]
+    #     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+    #     ax.imshow(mask_image)
+    #     del mask
+    #     gc.collect()
+    #
+    # def show_masks_on_image(self, raw_image, masks):
+    #     plt.clf()
+    #
+    #     fig = plt.figure()
+    #     plt.imshow(np.array(raw_image))
+    #     ax = fig.gca()
+    #     ax.set_autoscale_on(False)
+    #     for mask in masks:
+    #         self.show_mask(mask, ax=ax, random_color=True)
+    #     plt.axis("off")
+    #     # plt.show()
+    #     plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
+    #     del mask
+    #     gc.collect()
+
+    def show_mask(self, mask, ax, random_color=False):
+        if random_color:
+            color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+        else:
+            color = np.array([30/255, 144/255, 255/255, 0.6])
+        h, w = mask.shape[-2:]
+        mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+        ax.imshow(mask_image)
+        plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
+
+
+    def show_points(self, coords, labels, ax, marker_size=375):
+        pos_points = coords[labels==1]
+        neg_points = coords[labels==0]
+        ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
+        ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
+
+    def show_box(self, box, ax):
+        x0, y0 = box[0], box[1]
+        w, h = box[2] - box[0], box[3] - box[1]
+        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0,0,0,0), lw=2))
+
+
+    def show_anns(self, anns):
+        if len(anns) == 0:
+            return
+        sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
+        ax = plt.gca()
+        ax.set_autoscale_on(False)
+
+        img = np.ones((sorted_anns[0]['segmentation'].shape[0], sorted_anns[0]['segmentation'].shape[1], 4))
+        img[:,:,3] = 0
+        for ann in sorted_anns:
+            m = ann['segmentation']
+            color_mask = np.concatenate([np.random.random(3), [0.35]])
+            img[m] = color_mask
+        ax.imshow(img)
+
+
 
     def _detector_thread(self):
         while self._detector_thread_active:
@@ -112,8 +181,8 @@ class SAMModule(retico_core.AbstractModule):
             mask_generator = SamAutomaticMaskGenerator(
                 model= self.model,
                 points_per_side=32,
-                pred_iou_thresh=0.9,
-                stability_score_thresh=0.92,
+                pred_iou_thresh=0.999,
+                stability_score_thresh=0.96,
                 crop_n_layers=1,
                 crop_n_points_downscale_factor=2,
                 min_mask_region_area=400
@@ -123,7 +192,13 @@ class SAMModule(retico_core.AbstractModule):
             masks_generated = mask_generator.generate(sam_image)
             end = time.time()
             print(f"[time elapsed: {end - start}] {masks_generated[0].keys()}")
-
+            # self.show_masks_on_image(sam_image, masks_generated)
+            plt.figure(figsize=(20,20))
+            plt.imshow(image)
+            self.show_anns(masks_generated)
+            plt.axis('off')
+            plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
+            plt.close()
             if self.use_bbox:
                 valid_boxes = [] 
                 for box_num in range(len(masks_generated)):
