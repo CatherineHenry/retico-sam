@@ -48,7 +48,7 @@ class SAMModule(retico_core.AbstractModule):
         return DetectedObjectsIU
   
 
-    def __init__(self, model="facebook/sam-vit-base", show=False, use_bbox=False, use_seg=False, **kwargs):
+    def __init__(self, model="facebook/sam-vit-huge", show=False, use_bbox=False, use_seg=False, **kwargs):
         """
         Initialize the SAM Object Detection Module
         Args:
@@ -76,14 +76,17 @@ class SAMModule(retico_core.AbstractModule):
         gc.collect()
 
     def show_masks_on_image(self, raw_image, masks):
+        plt.clf()
+
+        fig = plt.figure()
         plt.imshow(np.array(raw_image))
-        ax = plt.gca()
+        ax = fig.gca()
         ax.set_autoscale_on(False)
         for mask in masks:
             self.show_mask(mask, ax=ax, random_color=True)
         plt.axis("off")
-        plt.show()
-        plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
+        # plt.show()
+        plt.savefig(f'hfsam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
         del mask
         gc.collect()
 
@@ -112,6 +115,7 @@ class SAMModule(retico_core.AbstractModule):
             outputs = self.generator(image, points_per_batch=64)
             end = time.time()
             print(f"[time elapsed: {end - start}]")
+            masks = outputs["masks"]
             masks = np.array(outputs["masks"])
             self.show_masks_on_image(image, masks)
 
@@ -120,11 +124,13 @@ class SAMModule(retico_core.AbstractModule):
             output_iu = self.create_iu(input_iu)
             if self.use_bbox:
                 bbox = sv.mask_to_xyxy(masks)
-                bytes = image.tobytes()
-                output_iu.set_detected_objects(base64.b64encode(bytes).decode(), bbox.tolist(), "bb")
+                output_iu.set_detected_objects(image, bbox, "bb")
+                #bytes = image.tobytes()
+                #output_iu.set_detected_objects(base64.b64encode(bytes).decode(), bbox.tolist(), "bb")
             elif self.use_seg:
-                bytes = image.tobytes()
-                output_iu.set_detected_objects(base64.b64encode(bytes).decode(), masks.tolist(), "seg")
+                output_iu.set_detected_objects(image, masks, "seg")
+            #     bytes = image.tobytes()
+            #     output_iu.set_detected_objects(base64.b64encode(bytes).decode(), masks.tolist(), "seg")
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
             self.append(um)
 
