@@ -8,6 +8,7 @@ detect all different objects within the image.
 import gc
 from collections import deque
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
 import cv2
@@ -28,6 +29,12 @@ import sys
 
 
 from retico_vision.vision import ImageIU, DetectedObjectsIU
+
+
+class ExtractType(Enum):
+    bb = 'bounding box'
+    seg = 'segment'
+
 
 class SAMModule(retico_core.AbstractModule):
     @staticmethod
@@ -58,7 +65,8 @@ class SAMModule(retico_core.AbstractModule):
         "b": "vit_b",
         "t": "vit_t",
     }
-    def __init__(self, model=None, path_to_chkpnt=None, use_bbox=False, use_seg=False, **kwargs):
+
+    def __init__(self, model=None, path_to_chkpnt=None, extract_type: ExtractType=None, **kwargs):
         """
         Initialize the SAM Object Detection Module
         Args:
@@ -75,10 +83,6 @@ class SAMModule(retico_core.AbstractModule):
             print("Other options include 'l' for vit_l and 'b' for vit_b.")
             model = "vit_h"
 
-        if (use_bbox==False and use_seg==False):
-            print("You may choose to use only bounding box or segmentation, please set ONLY one to true.")
-            exit()
-
         if (path_to_chkpnt==None):
             print("Path to checkpoint matching model type must be passed in.")
             exit()
@@ -90,8 +94,7 @@ class SAMModule(retico_core.AbstractModule):
             device = "cuda"
             self.model.to(device=device)
         self.queue = deque(maxlen=1)
-        self.use_bbox = use_bbox
-        self.use_seg = use_seg
+        self.extract_type = extract_type
 
     def process_update(self, update_message):
         for iu, ut in update_message:
@@ -126,15 +129,15 @@ class SAMModule(retico_core.AbstractModule):
     #     del mask
     #     gc.collect()
 
-    def show_mask(self, mask, ax, random_color=False):
-        if random_color:
-            color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-        else:
-            color = np.array([30/255, 144/255, 255/255, 0.6])
-        h, w = mask.shape[-2:]
-        mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-        ax.imshow(mask_image)
-        plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
+    # def show_mask(self, mask, ax, random_color=False):
+    #     if random_color:
+    #         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+    #     else:
+    #         color = np.array([30/255, 144/255, 255/255, 0.6])
+    #     h, w = mask.shape[-2:]
+    #     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+    #     ax.imshow(mask_image)
+    #     plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
 
 
     def show_points(self, coords, labels, ax, marker_size=375):
@@ -175,8 +178,6 @@ class SAMModule(retico_core.AbstractModule):
             
             input_iu = self.queue.popleft()
             image = input_iu.payload
-            path = Path(f"./no_obj_detection/{input_iu.execution_uuid}")
-            path.mkdir(parents=True, exist_ok=True)
 
             sam_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
             # cv2.imwrite('./test_sam_image.jpg', sam_image)
@@ -201,29 +202,36 @@ class SAMModule(retico_core.AbstractModule):
             self.show_anns(masks_generated)
             plt.axis('off')
 
+            if self.extract_type is ExtractType.bb:
+                valid_extractions = []
+                for box_num in range(len(masks_generated)):
+                    valid_extractions.append(masks_generated[box_num]['bbox']) #mask bounding box in XYWH format
+
+
+            elif self.extract_type is ExtractType.seg:
+                valid_extractions = []
+                for seg_num in range(len(masks_generated)):
+                    valid_extractions.append(masks_generated[seg_num]['segmentation'])
+
+            if len(valid_extractions) == 0:
+                path = Path(f"./no_{self.extract_type.value}/{input_iu.execution_uuid}")
+                path.mkdir(parents=True, exist_ok=True)
+                file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
+                imwrite_path = f"{str(path)}/{file_name}"
+                plt.savefig(imwrite_path)
+                plt.close()
+                continue
+
+            path = Path(f"./no_seg/{input_iu.execution_uuid}")
+            path.mkdir(parents=True, exist_ok=True)
             file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
             imwrite_path = f"{str(path)}/{file_name}"
             plt.savefig(imwrite_path)
             plt.close()
-            if self.use_bbox:
-                valid_boxes = [] 
-                for box_num in range(len(masks_generated)):
-                    valid_boxes.append(masks_generated[box_num]['bbox']) #mask bounding box in XYWH format 
-            if self.use_seg:
-                valid_segs = [] 
-                for seg_num in range(len(masks_generated)):
-                    valid_segs.append(masks_generated[seg_num]['segmentation'])   
-
-            if self.use_bbox:
-                if len(valid_boxes) == 0: continue
-            elif self.use_seg: 
-                if len(valid_segs) == 0: continue
 
             output_iu = self.create_iu(input_iu)
-            if self.use_bbox:
-                output_iu.set_detected_objects(image, valid_boxes, "bb")
-            elif self.use_seg:
-                output_iu.set_detected_objects(image, valid_segs, "seg")
+
+            output_iu.set_detected_objects(image, valid_extractions, self.extract_type.value)
             output_iu.set_flow_uuid(input_iu.flow_uuid)
             output_iu.set_motor_action(input_iu.motor_action)
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
