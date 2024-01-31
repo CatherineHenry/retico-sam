@@ -192,7 +192,7 @@ class SAMModule(retico_core.AbstractModule):
                 crop_n_points_downscale_factor=2,
                 min_mask_region_area=400
             )
-            print(f"Generating SAM mask")
+            print(f"Generating SAM mask {input_iu.flow_uuid}")
             start = time.time()
             masks_generated = mask_generator.generate(sam_image)
             end = time.time()
