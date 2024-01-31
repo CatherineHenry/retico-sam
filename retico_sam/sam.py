@@ -8,6 +8,7 @@ detect all different objects within the image.
 import gc
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -173,10 +174,12 @@ class SAMModule(retico_core.AbstractModule):
                 continue
             
             input_iu = self.queue.popleft()
-            image = input_iu.payload 
+            image = input_iu.payload
+            path = Path(f"./no_obj_detection/{input_iu.execution_uuid}")
+            path.mkdir(parents=True, exist_ok=True)
 
             sam_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
-            cv2.imwrite('./test_sam_image.jpg', sam_image)
+            # cv2.imwrite('./test_sam_image.jpg', sam_image)
 
             mask_generator = SamAutomaticMaskGenerator(
                 model= self.model,
@@ -197,7 +200,10 @@ class SAMModule(retico_core.AbstractModule):
             plt.imshow(image)
             self.show_anns(masks_generated)
             plt.axis('off')
-            plt.savefig(f'sam_masks/sam_mask_{datetime.now().strftime("%m-%d_%H-%M-%S")}.png')
+
+            file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
+            imwrite_path = f"{str(path)}/{file_name}"
+            plt.savefig(imwrite_path)
             plt.close()
             if self.use_bbox:
                 valid_boxes = [] 
@@ -218,6 +224,8 @@ class SAMModule(retico_core.AbstractModule):
                 output_iu.set_detected_objects(image, valid_boxes, "bb")
             elif self.use_seg:
                 output_iu.set_detected_objects(image, valid_segs, "seg")
+            output_iu.set_flow_uuid(input_iu.flow_uuid)
+            output_iu.set_motor_action(input_iu.motor_action)
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
             self.append(um)
 
