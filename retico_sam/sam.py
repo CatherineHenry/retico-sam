@@ -222,7 +222,7 @@ class SAMModule(retico_core.AbstractModule):
                 plt.close()
                 continue
 
-            path = Path(f"./no_{self.extract_type.name}/{input_iu.execution_uuid}")
+            path = Path(f"./{self.extract_type.name}/{input_iu.execution_uuid}")
             path.mkdir(parents=True, exist_ok=True)
             file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
             imwrite_path = f"{str(path)}/{file_name}"
