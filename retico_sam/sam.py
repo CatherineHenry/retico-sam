@@ -214,7 +214,7 @@ class SAMModule(retico_core.AbstractModule):
                     valid_extractions.append(masks_generated[seg_num]['segmentation'])
 
             if len(valid_extractions) == 0:
-                path = Path(f"./no_{self.extract_type.value}/{input_iu.execution_uuid}")
+                path = Path(f"./no_{self.extract_type.name}/{input_iu.execution_uuid}")
                 path.mkdir(parents=True, exist_ok=True)
                 file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
                 imwrite_path = f"{str(path)}/{file_name}"
@@ -222,7 +222,7 @@ class SAMModule(retico_core.AbstractModule):
                 plt.close()
                 continue
 
-            path = Path(f"./no_seg/{input_iu.execution_uuid}")
+            path = Path(f"./no_{self.extract_type.name}/{input_iu.execution_uuid}")
             path.mkdir(parents=True, exist_ok=True)
             file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
             imwrite_path = f"{str(path)}/{file_name}"
@@ -231,7 +231,7 @@ class SAMModule(retico_core.AbstractModule):
 
             output_iu = self.create_iu(input_iu)
 
-            output_iu.set_detected_objects(image, valid_extractions, self.extract_type.value)
+            output_iu.set_detected_objects(image, valid_extractions, self.extract_type.name)
             output_iu.set_flow_uuid(input_iu.flow_uuid)
             output_iu.set_motor_action(input_iu.motor_action)
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
