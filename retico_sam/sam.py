@@ -95,6 +95,7 @@ class SAMModule(retico_core.AbstractModule):
             self.model.to(device=device)
         self.queue = deque(maxlen=1)
         self.extract_type = extract_type
+        self.base_filepath = "./sam_output"
 
     def process_update(self, update_message):
         for iu, ut in update_message:
@@ -214,7 +215,7 @@ class SAMModule(retico_core.AbstractModule):
                     valid_extractions.append(masks_generated[seg_num]['segmentation'])
 
             if len(valid_extractions) == 0:
-                path = Path(f"./no_{self.extract_type.name}/{input_iu.execution_uuid}")
+                path = Path(f"{self.base_filepath}/no_{self.extract_type.name}/{input_iu.execution_uuid}")
                 path.mkdir(parents=True, exist_ok=True)
                 file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
                 imwrite_path = f"{str(path)}/{file_name}"
@@ -222,7 +223,7 @@ class SAMModule(retico_core.AbstractModule):
                 plt.close()
                 continue
 
-            path = Path(f"./{self.extract_type.name}/{input_iu.execution_uuid}")
+            path = Path(f"{self.base_filepath}/{self.extract_type.name}/{input_iu.execution_uuid}")
             path.mkdir(parents=True, exist_ok=True)
             file_name = f"{input_iu.flow_uuid}.png" # TODO: png or jpg better?
             imwrite_path = f"{str(path)}/{file_name}"
