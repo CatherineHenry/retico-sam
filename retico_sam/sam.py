@@ -186,7 +186,7 @@ class SAMModule(retico_core.AbstractModule):
             mask_generator = SamAutomaticMaskGenerator(
                 model= self.model,
                 points_per_side=32,
-                pred_iou_thresh=0.999,
+                pred_iou_thresh=0.96,
                 stability_score_thresh=0.96,
                 crop_n_layers=1,
                 crop_n_points_downscale_factor=2,
